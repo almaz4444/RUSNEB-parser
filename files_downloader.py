@@ -44,7 +44,7 @@ def get_logger(name=__file__, file='log.txt', encoding='utf-8'):
 
 logger = get_logger()
         
-async def get_response(url):
+async def get_response(url, file_path):
     while True:
         try:
             async with aiohttp.ClientSession() as session:
@@ -57,18 +57,20 @@ async def get_response(url):
                     if pbar and "ошибка сети" in pbar.desc:
                         pbar.desc = pbar.desc.removesuffix(" (ошибка сети)")
                         
-                    data = bytearray()
                     data_to_read = True
-                    while data_to_read:
-                        red = 0
-                        while red < chunk_size:
-                            chunk = await response.content.read(chunk_size - red)
-                            if not chunk:
-                                data_to_read = False
-                                break
-                            data.extend(chunk)
-                            red += len(chunk)
-                    return data
+                    
+                    async with async_open(file_path, "wb") as file:
+                        while data_to_read:
+                            data = bytearray()
+                            red = 0
+                            while red < chunk_size:
+                                chunk = await response.content.read(chunk_size - red)
+                                if not chunk:
+                                    data_to_read = False
+                                    break
+                                data.extend(chunk)
+                                red += len(chunk)
+                            await file.write(data)
         except (ClientOSError, ClientPayloadError, asyncio.TimeoutError, aiohttp.ServerDisconnectedError):
             if pbar:
                 if "ошибка сети" not in pbar.desc:
@@ -86,9 +88,7 @@ async def download_file(row):
             file_name, url = row.split("<sep>")
             file_path = f"{books_path if 'getFiles' in url else images_path}{file_name}"
             if not os.path.exists(file_path):
-                response = await get_response(url)
-                async with async_open(file_path, "wb") as file:
-                    await file.write(response)
+                await get_response(url)
             pbar.update(1)
     except KeyboardInterrupt:
         pass
