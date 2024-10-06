@@ -88,7 +88,7 @@ async def download_file(row):
             file_name, url = row.split("<sep>")
             file_path = f"{books_path if 'getFiles' in url else images_path}{file_name}"
             if not os.path.exists(file_path):
-                await get_response(url)
+                await get_response(url, file_path)
             pbar.update(1)
     except KeyboardInterrupt:
         pass
