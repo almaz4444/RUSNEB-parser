@@ -1,5 +1,1 @@
-aiohttp
-aiofile
-fake-useragent
-tqdm
-bs4
+aiohttp aiofile fake-useragent tqdm bs4
