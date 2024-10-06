@@ -1,0 +1,5 @@
+aiohttp
+aiofile
+fake-useragent
+tqdm
+bs4
