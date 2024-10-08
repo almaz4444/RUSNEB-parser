@@ -117,7 +117,7 @@ async def main():
                 with open(books_files_urls_file_path, encoding="utf-8") as file:
                     for index, row in enumerate(file):
                         if index > old_row_index and "Пустая книга" not in row and (max_tasks_count == -1 or len(tasks) < max_tasks_count):
-                            tasks.add(asyncio.create_task(download_file(row)))
+                            await download_file(row)
                             old_row_index = index
                             pbar.total = index
                 for task in tasks:

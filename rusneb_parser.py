@@ -289,7 +289,7 @@ async def parse_catalog(catalog_url, index, pages, catalog_attr_name):
                 
                 sec_to_iter = round((time() - start_time) / len(books_url), 2)
                 pbar.postfix = f"{sec_to_iter}s/it"
-        elif books_url is None:
+        else:
             break
             
         pages[index] += 1
@@ -309,15 +309,15 @@ async def main():
         
     catalogs_urls = []
     
-    for catalog_url in catalogs_urls_template:
-        for access in books_access_variants:
-            catalogs_urls.append(catalog_url.format(access=access) + "&PAGEN_1={page}")
+    # for catalog_url in catalogs_urls_template:
+    #     for access in books_access_variants:
+    #         catalogs_urls.append(catalog_url.format(access=access) + "&PAGEN_1={page}")
         
-    if os.path.exists(additional_search_file_path):
-        with open(additional_search_file_path, encoding="utf-8") as f:
-            for search in f.readlines():
-                for access in books_access_variants:
-                    catalogs_urls.append(additional_url_template.format(search=quote_plus(search), access=access) + "&PAGEN_1={page}")
+    # if os.path.exists(additional_search_file_path):
+    #     with open(additional_search_file_path, encoding="utf-8") as f:
+    #         for search in f.readlines():
+    #             for access in books_access_variants:
+    #                 catalogs_urls.append(additional_url_template.format(search=quote_plus(search), access=access) + "&PAGEN_1={page}")
         
     if not os.path.exists(config_file_path):
         config["runtime"] = {
@@ -341,8 +341,8 @@ async def main():
                     
     print(f"Всего кталогов: {len(catalogs_urls)}")
     
-    for index, catalog_url in enumerate(catalogs_urls):
-        await parse_catalog(catalog_url, index, pages, "catalogs_pages")
+    # for index, catalog_url in enumerate(catalogs_urls):
+    #     await parse_catalog(catalog_url, index, pages, "catalogs_pages")
 
     pages = collections_start_pages
     books_collections_urls = []
