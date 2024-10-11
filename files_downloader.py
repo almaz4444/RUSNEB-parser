@@ -1,11 +1,14 @@
+import asyncio
 import os
 import sys
 import configparser
-import requests
+import aiohttp
 import logging
-import shutil
 
+from aiofile import async_open
+import aiohttp.client_exceptions
 from tqdm import tqdm
+from aiohttp.client_exceptions import ClientOSError, ClientPayloadError
 
 
 headers = {
@@ -41,50 +44,56 @@ def get_logger(name=__file__, file='log.txt', encoding='utf-8'):
 
 logger = get_logger()
         
-def get_response(url, file_path):
+async def get_response(url, file_path):
     while True:
         try:
-            with requests.get(url, headers=headers, stream=True) as response:
-                if response.status_code == 404:
-                    break
-                if response.status_code != 200:
-                    print(response.status_code, url)
-                    continue
-                
-                if pbar and "ошибка сети" in pbar.desc:
-                    pbar.desc = pbar.desc.removesuffix(" (ошибка сети)")
-                
-                with open(file_path, "wb") as file:
-                    # file.write(response.content)
-                    # return
-                    for chunk in response.iter_content(chunk_size=chunk_size):
-                        pbar.refresh()
-                        if chunk:
-                            file.write(chunk)
-                            print("YES")
-                        else:
-                            print(" ELSE")
-        # except (ClientOSError, ClientPayloadError, asyncio.TimeoutError, aiohttp.ServerDisconnectedError):
-        #     if pbar:
-        #         if "ошибка сети" not in pbar.desc:
-        #             pbar.desc = f"{pbar.desc} (ошибка сети)"
-        #     else:
-        #         logger.error("Ошибка сети")
-        #     pbar.update(0)
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers) as response:
+                    if response.status == 404:
+                        break
+                    if response.status != 200:
+                        continue
+                    
+                    if pbar and "ошибка сети" in pbar.desc:
+                        pbar.desc = pbar.desc.removesuffix(" (ошибка сети)")
+                        
+                    data_to_read = True
+                    
+                    with open(file_path, "wb") as file:
+                        while data_to_read:
+                            data = bytearray()
+                            red = 0
+                            while red < chunk_size:
+                                chunk = await response.content.read(chunk_size - red)
+                                if not chunk:
+                                    data_to_read = False
+                                    break
+                                data.extend(chunk)
+                                red += len(chunk)
+                            print("DATA")
+                            file.write(data)
+        except (ClientOSError, ClientPayloadError, asyncio.TimeoutError, aiohttp.ServerDisconnectedError):
+            if pbar:
+                if "ошибка сети" not in pbar.desc:
+                    pbar.desc = f"{pbar.desc} (ошибка сети)"
+            else:
+                logger.error("Ошибка сети")
+            pbar.refresh()
         except Exception as e:
             logger.error(f"Ошибка ({url}) {e}", exc_info=True)
+        await asyncio.sleep(0)
             
-def download_file(row):
+async def download_file(row):
     try:
         if len(row.split("<sep>")) == 2:
             file_name, url = row.split("<sep>")
             file_path = f"{books_path if 'getFiles' in url else images_path}{file_name}"
-            if not os.path.exists(file_path):
-                get_response(url.removesuffix("\n"), file_path)
+            if not os.path.exists(file_path) or True:
+                await get_response(url, file_path)
     except KeyboardInterrupt:
-        quit()
+        pass
     
-def main():
+async def main():
     global pbar
     
     max_tasks_count = -1
@@ -101,26 +110,30 @@ def main():
         open(books_files_urls_file_path, "w", encoding="utf-8").close()
     
     with tqdm(total=0, desc=f"Скачивание файлов") as pbar:
+        tasks = set()
         old_row_index = 0
         while True:
             try:
                 with open(books_files_urls_file_path, encoding="utf-8") as file:
-                    file_rows = file.readlines()
-                    pbar.total = len(file_rows) - 1
-                    pbar.refresh()
-                    for index, row in enumerate(file_rows):
-                        if index > old_row_index and "Пустая книга" not in row:
+                    for index, row in enumerate(file):
+                        if index > old_row_index and "Пустая книга" not in row and (max_tasks_count == -1 or len(tasks) < max_tasks_count):
+                            await download_file(row)
                             old_row_index = index
-                            download_file(row)
-                            pbar.update(1)
+                            pbar.total = index
+                for task in tasks:
+                    if task.done():
+                        tasks.remove(task)
+                        pbar.update(1)
+                        break
                 pbar.refresh()
+                await asyncio.sleep(0)
             except UnicodeDecodeError as e:
                 logger.error(e, exc_info=True)
             
 if __name__ == "__main__":
     while True:
         try:
-            main()
+            asyncio.run(main())
         except KeyboardInterrupt:
             break
         except Exception as e:
