@@ -48,13 +48,22 @@ def get_response(url, file_path):
                 if response.status_code == 404:
                     break
                 if response.status_code != 200:
+                    print(response.status_code, url)
                     continue
                 
                 if pbar and "ошибка сети" in pbar.desc:
                     pbar.desc = pbar.desc.removesuffix(" (ошибка сети)")
                 
                 with open(file_path, "wb") as file:
-                    shutil.copyfileobj(response.raw, file)
+                    # file.write(response.content)
+                    # return
+                    for chunk in response.iter_content(chunk_size=chunk_size):
+                        pbar.refresh()
+                        if chunk:
+                            file.write(chunk)
+                            print("YES")
+                        else:
+                            print(" ELSE")
         # except (ClientOSError, ClientPayloadError, asyncio.TimeoutError, aiohttp.ServerDisconnectedError):
         #     if pbar:
         #         if "ошибка сети" not in pbar.desc:
@@ -71,10 +80,9 @@ def download_file(row):
             file_name, url = row.split("<sep>")
             file_path = f"{books_path if 'getFiles' in url else images_path}{file_name}"
             if not os.path.exists(file_path):
-                get_response(url, file_path)
-            pbar.update(1)
+                get_response(url.removesuffix("\n"), file_path)
     except KeyboardInterrupt:
-        pass
+        quit()
     
 def main():
     global pbar
@@ -93,21 +101,19 @@ def main():
         open(books_files_urls_file_path, "w", encoding="utf-8").close()
     
     with tqdm(total=0, desc=f"Скачивание файлов") as pbar:
-        tasks = set()
         old_row_index = 0
         while True:
             try:
                 with open(books_files_urls_file_path, encoding="utf-8") as file:
-                    for index, row in enumerate(file):
-                        if index > old_row_index and "Пустая книга" not in row and (max_tasks_count == -1 or len(tasks) < max_tasks_count):
-                            download_file(row)
+                    file_rows = file.readlines()
+                    pbar.total = len(file_rows) - 1
+                    pbar.refresh()
+                    for index, row in enumerate(file_rows):
+                        if index > old_row_index and "Пустая книга" not in row:
                             old_row_index = index
-                            pbar.total = index
-                for task in tasks:
-                    if task.done():
-                        tasks.remove(task)
-                        break
-                pbar.update(0)
+                            download_file(row)
+                            pbar.update(1)
+                pbar.refresh()
             except UnicodeDecodeError as e:
                 logger.error(e, exc_info=True)
             
