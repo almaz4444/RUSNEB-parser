@@ -86,7 +86,6 @@ async def get_response(url, file_path):
             
 async def download_file(row):
     try:
-        print(row)
         if len(row.split("<sep>")) == 2:
             file_name, url = row.split("<sep>")
             file_path = f"{books_path if 'getFiles' in url else images_path}{file_name}"
