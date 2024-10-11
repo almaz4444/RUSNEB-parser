@@ -52,6 +52,7 @@ async def get_response(url, file_path):
                     if response.status == 404:
                         break
                     if response.status != 200:
+                        print(response.status)
                         continue
                     
                     if pbar and "ошибка сети" in pbar.desc:
@@ -70,8 +71,8 @@ async def get_response(url, file_path):
                                     break
                                 data.extend(chunk)
                                 red += len(chunk)
-                            print("DATA")
                             file.write(data)
+            break
         except (ClientOSError, ClientPayloadError, asyncio.TimeoutError, aiohttp.ServerDisconnectedError):
             if pbar:
                 if "ошибка сети" not in pbar.desc:
@@ -85,6 +86,7 @@ async def get_response(url, file_path):
             
 async def download_file(row):
     try:
+        print(row)
         if len(row.split("<sep>")) == 2:
             file_name, url = row.split("<sep>")
             file_path = f"{books_path if 'getFiles' in url else images_path}{file_name}"
@@ -111,15 +113,15 @@ async def main():
     
     with tqdm(total=0, desc=f"Скачивание файлов") as pbar:
         tasks = set()
-        old_row_index = 0
+        old_row_index = -1
         while True:
             try:
                 with open(books_files_urls_file_path, encoding="utf-8") as file:
                     for index, row in enumerate(file):
                         if index > old_row_index and "Пустая книга" not in row and (max_tasks_count == -1 or len(tasks) < max_tasks_count):
-                            await download_file(row)
+                            tasks.add(asyncio.create_task(download_file(row)))
                             old_row_index = index
-                            pbar.total = index
+                            pbar.total = index + 1
                 for task in tasks:
                     if task.done():
                         tasks.remove(task)
